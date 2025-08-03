@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { Task, CreateTaskRequest, UpdateTaskRequest, TaskStatus } from '@/types/task';
-import { DeepSeekService } from '@/services/ai/deepseek';
+import { OpenAIService } from '@/services/ai/openai';
 
 interface TaskState {
   tasks: Task[];
@@ -140,7 +140,7 @@ export const useTaskStore = create<TaskState & TaskActions>((set, get) => ({
   // AI Integration
   parseNaturalLanguage: async (text) => {
     try {
-      return await DeepSeekService.parseNaturalLanguage(text);
+      return await OpenAIService.parseNaturalLanguage(text);
     } catch (error) {
       console.error('AI parsing failed:', error);
       // Fallback: create a simple task from the text

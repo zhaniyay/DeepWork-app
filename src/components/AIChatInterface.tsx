@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { Text, TextInput, Button, Card, Avatar, Chip, IconButton } from 'react-native-paper';
-import { DeepSeekService } from '@/services/ai/deepseek';
+import { OpenAIService } from '@/services/ai/openai';
 import { useTaskStore } from '@/stores/taskStore';
 import { colors } from '@/constants/colors';
 
@@ -71,7 +71,7 @@ export const AIChatInterface: React.FC<AIChatInterfaceProps> = ({
 
       if (isTaskRequest) {
         // Parse as task
-        const parsedTasks = await DeepSeekService.parseNaturalLanguage(inputText.trim());
+        const parsedTasks = await OpenAIService.parseNaturalLanguage(inputText.trim());
         
         if (parsedTasks.length > 0) {
           // Create the first task
@@ -106,7 +106,7 @@ export const AIChatInterface: React.FC<AIChatInterfaceProps> = ({
           content: msg.content,
         }));
 
-        const response = await DeepSeekService.chatWithAI([
+        const response = await OpenAIService.chatWithAI([
           ...chatMessages,
           { role: 'user', content: inputText.trim() },
         ]);

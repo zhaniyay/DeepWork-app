@@ -5,7 +5,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useTaskStore } from '@/stores/taskStore';
 import { useProgressStore } from '@/stores/progressStore';
 import { useSettingsStore } from '@/stores/settingsStore';
-import { DeepSeekService } from '@/services/ai/deepseek';
+import { OpenAIService } from '@/services/ai/openai';
 import { colors } from '@/constants/colors';
 
 // Mock the stores
@@ -13,7 +13,7 @@ jest.mock('@/stores/authStore');
 jest.mock('@/stores/taskStore');
 jest.mock('@/stores/progressStore');
 jest.mock('@/stores/settingsStore');
-jest.mock('@/services/ai/deepseek');
+jest.mock('@/services/ai/openai');
 
 // Test wrapper component
 const TestWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -149,9 +149,9 @@ describe('Focus-AI App Test Suite', () => {
         },
       ]);
 
-      (DeepSeekService.parseNaturalLanguage as jest.Mock) = mockParseNaturalLanguage;
+      (OpenAIService.parseNaturalLanguage as jest.Mock) = mockParseNaturalLanguage;
 
-      const result = await DeepSeekService.parseNaturalLanguage('Complete project proposal by Friday');
+      const result = await OpenAIService.parseNaturalLanguage('Complete project proposal by Friday');
       
       expect(result).toHaveLength(1);
       expect(result[0].title).toBe('Complete project proposal');
@@ -163,9 +163,9 @@ describe('Focus-AI App Test Suite', () => {
         suggestions: ['Add a new task', 'View your progress'],
       });
 
-      (DeepSeekService.chat as jest.Mock) = mockChat;
+      (OpenAIService.chatWithAI as jest.Mock) = mockChat;
 
-      const response = await DeepSeekService.chat('Hello, can you help me?');
+      const response = await OpenAIService.chatWithAI([{ role: 'user', content: 'Hello, can you help me?' }]);
       
       expect(response.message).toBe('I can help you create tasks!');
       expect(response.suggestions).toHaveLength(2);
@@ -343,10 +343,10 @@ describe('Focus-AI App Test Suite', () => {
         new Error('AI service unavailable')
       );
 
-      (DeepSeekService.parseNaturalLanguage as jest.Mock) = mockParseNaturalLanguage;
+      (OpenAIService.parseNaturalLanguage as jest.Mock) = mockParseNaturalLanguage;
 
       try {
-        await DeepSeekService.parseNaturalLanguage('test task');
+        await OpenAIService.parseNaturalLanguage('test task');
       } catch (error) {
         expect(error.message).toBe('AI service unavailable');
       }
@@ -452,9 +452,9 @@ describe('Complete User Flow Integration Test', () => {
       tasks: [],
     });
 
-    (DeepSeekService.parseNaturalLanguage as jest.Mock) = mockParseNaturalLanguage;
+    (OpenAIService.parseNaturalLanguage as jest.Mock) = mockParseNaturalLanguage;
 
-    const tasks = await DeepSeekService.parseNaturalLanguage('Complete project proposal');
+    const tasks = await OpenAIService.parseNaturalLanguage('Complete project proposal');
     await mockCreateTask(tasks[0]);
 
     // 3. User starts a focus session

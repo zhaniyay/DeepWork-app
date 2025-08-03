@@ -107,7 +107,7 @@ export default function DashboardScreen() {
                 <View style={styles.actionButtons}>
                                   <Button
                   mode="contained"
-                  onPress={() => router.push('chat')}
+                  onPress={() => router.push('chat/index')}
                   style={styles.actionButton}
                   icon="robot"
                 >
@@ -115,7 +115,7 @@ export default function DashboardScreen() {
                 </Button>
                 <Button
                   mode="outlined"
-                  onPress={() => router.push('progress')}
+                  onPress={() => router.push('progress/index')}
                   style={styles.actionButton}
                   icon="chart-line"
                 >
@@ -125,7 +125,7 @@ export default function DashboardScreen() {
                 <View style={styles.actionButtons}>
                                   <Button
                   mode="outlined"
-                  onPress={() => router.push('settings')}
+                  onPress={() => router.push('settings/index')}
                   style={styles.actionButton}
                   icon="cog"
                 >
@@ -133,7 +133,7 @@ export default function DashboardScreen() {
                 </Button>
                 <Button
                   mode="outlined"
-                  onPress={() => router.push('tasks')}
+                  onPress={() => router.push('tasks/index')}
                   style={styles.actionButton}
                   icon="format-list-bulleted"
                 >
@@ -172,7 +172,7 @@ export default function DashboardScreen() {
                     </Text>
                                     <Button
                   mode="contained"
-                  onPress={() => router.push('chat')}
+                  onPress={() => router.push('chat/index')}
                   style={styles.emptyButton}
                 >
                   Add First Task
