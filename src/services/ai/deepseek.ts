@@ -129,7 +129,6 @@ Return only valid JSON array.
       manual_priority: 0,
     }];
   }
-  }
 
   static async getNextTaskRecommendation(tasks: Task[]): Promise<Task | null> {
     if (tasks.length === 0) return null;
