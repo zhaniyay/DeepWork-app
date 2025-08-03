@@ -32,7 +32,7 @@ export default function TasksScreen() {
         </Text>
         <Button
           mode="contained"
-          onPress={() => router.push('chat/index')}
+          onPress={() => router.push('chat')}
           icon="plus"
         >
           Add Task
@@ -98,7 +98,7 @@ export default function TasksScreen() {
             </Text>
             <Button
               mode="contained"
-              onPress={() => router.push('chat/index')}
+              onPress={() => router.push('chat')}
               style={styles.emptyButton}
               icon="plus"
             >
@@ -111,7 +111,7 @@ export default function TasksScreen() {
       <FAB
         icon="plus"
         style={styles.fab}
-        onPress={() => router.push('chat/index')}
+        onPress={() => router.push('chat')}
         label="Add Task"
       />
     </View>
