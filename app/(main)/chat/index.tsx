@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { AIChatInterface } from '@/components/AIChatInterface';
+import { EnhancedAIChatInterface } from '@/components/EnhancedAIChatInterface';
 import { useRouter } from 'expo-router';
 import { colors } from '@/constants/colors';
 
@@ -16,11 +16,17 @@ export default function ChatScreen() {
     router.back();
   };
 
+  const handleStartFocusSession = (duration: number) => {
+    // Navigate to focus session with the suggested duration
+    router.push(`/focus/${duration}`);
+  };
+
   return (
     <View style={styles.container}>
-      <AIChatInterface
+      <EnhancedAIChatInterface
         onTaskCreated={handleTaskCreated}
         onClose={handleClose}
+        onStartFocusSession={handleStartFocusSession}
       />
     </View>
   );
