@@ -16,6 +16,7 @@ export interface Task {
 export const TaskStatus = {
   PENDING: 'pending',
   IN_PROGRESS: 'in-progress',
+  PAUSED: 'paused',
   COMPLETED: 'completed',
   DEFERRED: 'deferred',
 } as const;

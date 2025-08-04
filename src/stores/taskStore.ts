@@ -21,6 +21,7 @@ interface TaskActions {
   markTaskComplete: (id: string) => Promise<void>;
   markTaskInProgress: (id: string) => Promise<void>;
   markTaskDeferred: (id: string) => Promise<void>;
+  markTaskPaused: (id: string) => Promise<void>;
   
   // AI Integration
   parseNaturalLanguage: (text: string) => Promise<Task[]>;
@@ -110,8 +111,9 @@ export const useTaskStore = create<TaskState & TaskActions>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       // TODO: Implement API call to Supabase
-      // For now, return empty array - no mock data
-      set({ tasks: [], isLoading: false });
+      // For now, keep existing tasks in memory instead of clearing them
+      // This prevents tasks created via AI chat from disappearing
+      set({ isLoading: false });
     } catch (error) {
       set({ 
         error: error instanceof Error ? error.message : 'Failed to fetch tasks',
@@ -135,6 +137,10 @@ export const useTaskStore = create<TaskState & TaskActions>((set, get) => ({
 
   markTaskDeferred: async (id) => {
     await get().updateTask(id, { status: TaskStatus.DEFERRED });
+  },
+
+  markTaskPaused: async (id) => {
+    await get().updateTask(id, { status: TaskStatus.PAUSED });
   },
 
   // AI Integration

@@ -1,7 +1,10 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import { Text, Card, ProgressBar, Chip, Button } from 'react-native-paper';
+import { useRouter } from 'expo-router';
 import { useProgressStore } from '@/stores/progressStore';
+import { useTaskStore } from '@/stores/taskStore';
+import { TaskStatus } from '@/types/task';
 import { colors } from '@/constants/colors';
 
 interface ProgressDashboardProps {
@@ -14,10 +17,34 @@ export const ProgressDashboard: React.FC<ProgressDashboardProps> = ({
   onViewAnalytics,
 }) => {
   const { stats, isLoading, getProgressStats } = useProgressStore();
+  const { tasks, markTaskInProgress, selectTask } = useTaskStore();
+  const router = useRouter();
 
   useEffect(() => {
     getProgressStats();
   }, []);
+
+  // Filter tasks for progress display
+  const pausedTasks = useMemo(() => 
+    tasks.filter(task => task.status === TaskStatus.PAUSED),
+    [tasks]
+  );
+
+  const recentCompleted = useMemo(() => 
+    tasks.filter(task => 
+      task.status === TaskStatus.COMPLETED && 
+      new Date(task.updated_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+    ),
+    [tasks]
+  );
+
+  const upcomingTasks = useMemo(() => 
+    tasks
+      .filter(task => task.status === TaskStatus.PENDING)
+      .sort((a, b) => b.priority_score - a.priority_score)
+      .slice(0, 3),
+    [tasks]
+  );
 
   const formatTime = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
@@ -35,6 +62,31 @@ export const ProgressDashboard: React.FC<ProgressDashboardProps> = ({
     if (streak >= 7) return '🔥';
     if (streak >= 3) return '⚡';
     return '💪';
+  };
+
+  const getPriorityColor = (priority: number) => {
+    if (priority >= 80) return colors.error.primary;
+    if (priority >= 60) return colors.warning.primary;
+    return colors.success.primary;
+  };
+
+  const getPriorityText = (priority: number) => {
+    if (priority >= 80) return 'High';
+    if (priority >= 60) return 'Medium';
+    return 'Low';
+  };
+
+  const handleResumeTask = async (task: any) => {
+    try {
+      // Mark task as in progress
+      await markTaskInProgress(task.id);
+      // Select the task for focus session
+      selectTask(task);
+      // Navigate to focus session
+      router.push('focus/25');
+    } catch (error) {
+      console.error('Failed to resume task:', error);
+    }
   };
 
   if (isLoading) {
@@ -95,6 +147,62 @@ export const ProgressDashboard: React.FC<ProgressDashboardProps> = ({
           </Card.Content>
         </Card>
       </View>
+
+      {/* Paused Tasks Section */}
+      {pausedTasks.length > 0 && (
+        <Card style={styles.tasksCard}>
+          <Card.Content>
+            <Text variant="titleMedium" style={styles.tasksTitle}>
+              Paused Tasks ({pausedTasks.length})
+            </Text>
+            {pausedTasks.map((task) => (
+                              <View key={task.id} style={styles.taskItem}>
+                  <View style={styles.taskHeader}>
+                    <Text variant="bodyLarge" style={styles.taskTitle}>
+                      ⏸️ {task.title}
+                    </Text>
+                  <Chip 
+                    mode="outlined" 
+                    style={[
+                      styles.priorityChip, 
+                      { borderColor: getPriorityColor(task.priority_score) }
+                    ]}
+                    textStyle={{ color: getPriorityColor(task.priority_score) }}
+                  >
+                    {getPriorityText(task.priority_score)}
+                  </Chip>
+                </View>
+                {task.description && (
+                  <Text variant="bodySmall" style={styles.taskDescription}>
+                    {task.description}
+                  </Text>
+                )}
+                <View style={styles.taskProgress}>
+                  <Text variant="bodySmall" style={styles.taskTime}>
+                    ⏱️ {task.estimated_minutes || 30}m estimated
+                  </Text>
+                  <ProgressBar 
+                    progress={0.3} // TODO: Calculate actual progress
+                    color={colors.warning.primary}
+                    style={styles.taskProgressBar}
+                  />
+                  <Text variant="bodySmall" style={styles.progressText}>
+                    30% complete (paused)
+                  </Text>
+                  <Button
+                    mode="contained"
+                    onPress={() => handleResumeTask(task)}
+                    style={styles.resumeButton}
+                    icon="play"
+                  >
+                    Resume Task
+                  </Button>
+                </View>
+              </View>
+            ))}
+          </Card.Content>
+        </Card>
+      )}
 
       {/* Streak Section */}
       <Card style={styles.streakCard}>
@@ -317,5 +425,57 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     flex: 1,
+  },
+  tasksCard: {
+    marginBottom: 16,
+    elevation: 2,
+  },
+  tasksTitle: {
+    color: colors.text.primary.light,
+    fontWeight: 'bold',
+    marginBottom: 12,
+  },
+  taskItem: {
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.surface.secondary,
+  },
+  taskHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  taskTitle: {
+    color: colors.text.primary.light,
+    flex: 1,
+    marginRight: 8,
+  },
+  taskDescription: {
+    color: colors.text.secondary.light,
+    marginBottom: 8,
+  },
+  taskProgress: {
+    marginTop: 8,
+  },
+  taskTime: {
+    color: colors.text.secondary.light,
+    marginBottom: 4,
+  },
+  taskProgressBar: {
+    marginBottom: 4,
+    height: 6,
+    borderRadius: 3,
+  },
+  progressText: {
+    color: colors.text.secondary.light,
+    textAlign: 'center',
+  },
+  priorityChip: {
+    backgroundColor: colors.surface.secondary,
+  },
+  resumeButton: {
+    marginTop: 8,
   },
 }); 

@@ -31,8 +31,21 @@ export default function FocusSessionScreen() {
     }, 2000);
   };
 
-  const handleSessionPause = () => {
-    // TODO: Handle session pause
+  const handleSessionPause = async () => {
+    if (selectedTask) {
+      try {
+        // Mark task as paused when session is paused
+        await useTaskStore.getState().markTaskPaused(selectedTask.id);
+        console.log('Task paused:', selectedTask.title);
+        
+        // Show toast notification
+        // Note: We'll need to implement a global toast system or pass this through props
+        // For now, we'll just log it
+        console.log('Toast: Task paused. [Resume]');
+      } catch (error) {
+        console.error('Failed to pause task:', error);
+      }
+    }
     console.log('Session paused');
   };
 

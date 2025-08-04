@@ -9,11 +9,11 @@ export default function MainLayout() {
       }}
     >
       <Stack.Screen name="dashboard" />
-      <Stack.Screen name="chat" />
-      <Stack.Screen name="focus" />
-      <Stack.Screen name="progress" />
-      <Stack.Screen name="settings" />
-      <Stack.Screen name="tasks" />
+      <Stack.Screen name="chat/index" />
+      <Stack.Screen name="focus/[duration]" />
+      <Stack.Screen name="progress/index" />
+      <Stack.Screen name="settings/index" />
+      <Stack.Screen name="tasks/index" />
     </Stack>
   );
 } 

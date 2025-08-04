@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, StyleSheet, FlatList } from 'react-native';
 import { Card, Text, Button, Chip, IconButton, Menu } from 'react-native-paper';
 import { useTaskStore } from '@/stores/taskStore';
 import { Task, TaskStatus, TaskStatusType } from '@/types/task';
 import { colors } from '@/constants/colors';
+import { Toast } from './Toast';
 
 interface TaskListProps {
   onTaskSelect?: (task: Task) => void;
@@ -14,8 +15,11 @@ export const TaskList: React.FC<TaskListProps> = ({
   onTaskSelect, 
   showCompleted = false 
 }) => {
-  const { tasks, markTaskComplete, markTaskInProgress, markTaskDeferred, deleteTask } = useTaskStore();
+  const { tasks, markTaskComplete, markTaskInProgress, markTaskDeferred, deleteTask, selectTask } = useTaskStore();
   const [menuVisible, setMenuVisible] = React.useState<string | null>(null);
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastAction, setToastAction] = useState<{ label: string; onPress: () => void } | undefined>();
 
   const filteredTasks = tasks.filter(task => 
     showCompleted ? true : task.status !== TaskStatus.COMPLETED
@@ -33,6 +37,8 @@ export const TaskList: React.FC<TaskListProps> = ({
         return colors.success.primary;
       case TaskStatus.IN_PROGRESS:
         return colors.warning.primary;
+      case TaskStatus.PAUSED:
+        return colors.warning.primary;
       case TaskStatus.DEFERRED:
         return colors.error.primary;
       default:
@@ -46,6 +52,8 @@ export const TaskList: React.FC<TaskListProps> = ({
         return 'Completed';
       case TaskStatus.IN_PROGRESS:
         return 'In Progress';
+      case TaskStatus.PAUSED:
+        return 'Paused';
       case TaskStatus.DEFERRED:
         return 'Deferred';
       default:
@@ -56,20 +64,44 @@ export const TaskList: React.FC<TaskListProps> = ({
   const handleTaskAction = async (taskId: string, action: string) => {
     setMenuVisible(null);
     
-    switch (action) {
-      case 'complete':
-        await markTaskComplete(taskId);
-        break;
-      case 'start':
-        await markTaskInProgress(taskId);
-        break;
-      case 'defer':
-        await markTaskDeferred(taskId);
-        break;
-      case 'delete':
-        await deleteTask(taskId);
-        break;
+    try {
+      switch (action) {
+        case 'complete':
+          await markTaskComplete(taskId);
+          break;
+        case 'start':
+          await markTaskInProgress(taskId);
+          break;
+        case 'resume':
+          await markTaskInProgress(taskId);
+          break;
+        case 'defer':
+          await markTaskDeferred(taskId);
+          break;
+        case 'delete':
+          await deleteTask(taskId);
+          break;
+      }
+    } catch (error) {
+      console.error('Task action failed:', error);
+      // Could add a toast notification here
     }
+  };
+
+  const showPauseToast = (taskTitle: string) => {
+    setToastMessage(`Task paused.`);
+    setToastAction({
+      label: 'Resume',
+      onPress: () => {
+        // Find the paused task and resume it
+        const pausedTask = tasks.find(t => t.title === taskTitle && t.status === TaskStatus.PAUSED);
+        if (pausedTask) {
+          handleTaskAction(pausedTask.id, 'resume');
+        }
+        setToastVisible(false);
+      },
+    });
+    setToastVisible(true);
   };
 
   const renderTask = ({ item: task }: { item: Task }) => (
@@ -103,11 +135,20 @@ export const TaskList: React.FC<TaskListProps> = ({
               />
             }
           >
-            <Menu.Item 
-              onPress={() => handleTaskAction(task.id, 'start')}
-              title="Start Task"
-              leadingIcon="play"
-            />
+            {task.status === TaskStatus.PENDING && (
+              <Menu.Item 
+                onPress={() => handleTaskAction(task.id, 'start')}
+                title="Start Task"
+                leadingIcon="play"
+              />
+            )}
+            {task.status === TaskStatus.PAUSED && (
+              <Menu.Item 
+                onPress={() => handleTaskAction(task.id, 'resume')}
+                title="Resume Task"
+                leadingIcon="play"
+              />
+            )}
             <Menu.Item 
               onPress={() => handleTaskAction(task.id, 'complete')}
               title="Mark Complete"
@@ -116,7 +157,7 @@ export const TaskList: React.FC<TaskListProps> = ({
             <Menu.Item 
               onPress={() => handleTaskAction(task.id, 'defer')}
               title="Defer"
-              leadingIcon="clock-outline"
+                              leadingIcon="clock"
             />
             <Menu.Item 
               onPress={() => handleTaskAction(task.id, 'delete')}
@@ -140,6 +181,7 @@ export const TaskList: React.FC<TaskListProps> = ({
               mode="outlined"
               style={[styles.statusChip, { borderColor: getStatusColor(task.status) }]}
               textStyle={{ color: getStatusColor(task.status) }}
+              onPress={task.status === TaskStatus.PAUSED ? () => handleTaskAction(task.id, 'resume') : undefined}
             >
               {getStatusText(task.status)}
             </Chip>
@@ -180,24 +222,46 @@ export const TaskList: React.FC<TaskListProps> = ({
             Start Focus Session
           </Button>
         )}
+        
+        {task.status === TaskStatus.PAUSED && (
+          <Button
+            mode="contained"
+            onPress={() => handleTaskAction(task.id, 'resume')}
+            style={styles.resumeButton}
+            icon="play"
+          >
+            Resume Task
+          </Button>
+        )}
       </Card.Content>
     </Card>
   );
 
   return (
-    <FlatList
-      data={filteredTasks}
-      renderItem={renderTask}
-      keyExtractor={(item) => item.id}
-      style={styles.container}
-      contentContainerStyle={styles.contentContainer}
-      showsVerticalScrollIndicator={false}
-    />
+    <View style={styles.container}>
+      <FlatList
+        data={filteredTasks}
+        renderItem={renderTask}
+        keyExtractor={(item) => item.id}
+        style={styles.listContainer}
+        contentContainerStyle={styles.contentContainer}
+        showsVerticalScrollIndicator={false}
+      />
+      <Toast
+        visible={toastVisible}
+        message={toastMessage}
+        action={toastAction}
+        onDismiss={() => setToastVisible(false)}
+      />
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
+  },
+  listContainer: {
     flex: 1,
   },
   contentContainer: {
@@ -258,5 +322,9 @@ const styles = StyleSheet.create({
   },
   startButton: {
     marginTop: 8,
+  },
+  resumeButton: {
+    marginTop: 8,
+    backgroundColor: colors.warning.primary,
   },
 }); 

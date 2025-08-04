@@ -18,11 +18,9 @@ interface UserPreferences {
     streakAchievements: boolean;
   };
   aiPreferences: {
-    aggressiveness: 'conservative' | 'balanced' | 'aggressive';
     tone: 'professional' | 'friendly' | 'motivational';
     autoSuggestions: boolean;
   };
-  theme: 'light' | 'dark' | 'auto';
   soundEnabled: boolean;
   vibrationEnabled: boolean;
 }
@@ -31,6 +29,7 @@ interface SettingsState {
   preferences: UserPreferences;
   isLoading: boolean;
   error: string | null;
+  lastSaved: Date | null;
 }
 
 interface SettingsActions {
@@ -49,7 +48,7 @@ interface SettingsActions {
 }
 
 const defaultPreferences: UserPreferences = {
-  sessionLength: 25,
+  sessionLength: 30,
   autoStartNextSession: false,
   autoLogDistractions: true,
   quietHours: {
@@ -65,11 +64,9 @@ const defaultPreferences: UserPreferences = {
     streakAchievements: true,
   },
   aiPreferences: {
-    aggressiveness: 'balanced',
     tone: 'friendly',
     autoSuggestions: true,
   },
-  theme: 'auto',
   soundEnabled: true,
   vibrationEnabled: true,
 };
@@ -78,6 +75,7 @@ export const useSettingsStore = create<SettingsState & SettingsActions>((set, ge
   preferences: defaultPreferences,
   isLoading: false,
   error: null,
+  lastSaved: null,
 
   // Preferences management
   updatePreferences: async (updates) => {
@@ -86,12 +84,22 @@ export const useSettingsStore = create<SettingsState & SettingsActions>((set, ge
       const newPreferences = { ...get().preferences, ...updates };
       set({ preferences: newPreferences });
       await get().savePreferences();
-      set({ isLoading: false });
+      set({ isLoading: false, lastSaved: new Date() });
+      
+      // Clear success message after 2 seconds
+      setTimeout(() => {
+        set({ lastSaved: null });
+      }, 2000);
     } catch (error) {
       set({ 
         error: error instanceof Error ? error.message : 'Failed to update preferences',
         isLoading: false 
       });
+      
+      // Clear error after 5 seconds
+      setTimeout(() => {
+        set({ error: null });
+      }, 5000);
     }
   },
 
@@ -100,12 +108,22 @@ export const useSettingsStore = create<SettingsState & SettingsActions>((set, ge
     try {
       set({ preferences: defaultPreferences });
       await get().savePreferences();
-      set({ isLoading: false });
+      set({ isLoading: false, lastSaved: new Date() });
+      
+      // Clear success message after 2 seconds
+      setTimeout(() => {
+        set({ lastSaved: null });
+      }, 2000);
     } catch (error) {
       set({ 
         error: error instanceof Error ? error.message : 'Failed to reset preferences',
         isLoading: false 
       });
+      
+      // Clear error after 5 seconds
+      setTimeout(() => {
+        set({ error: null });
+      }, 5000);
     }
   },
 
@@ -115,23 +133,36 @@ export const useSettingsStore = create<SettingsState & SettingsActions>((set, ge
     try {
       const stored = await AsyncStorage.getItem('user_preferences');
       if (stored) {
-        const preferences = JSON.parse(stored);
-        set({ preferences: { ...defaultPreferences, ...preferences }, isLoading: false });
+        const parsedPreferences = JSON.parse(stored);
+        // Merge with defaults to ensure all properties exist
+        const mergedPreferences = { ...defaultPreferences, ...parsedPreferences };
+        set({ preferences: mergedPreferences, isLoading: false });
       } else {
         set({ preferences: defaultPreferences, isLoading: false });
       }
     } catch (error) {
       console.error('Failed to load preferences:', error);
-      set({ preferences: defaultPreferences, isLoading: false });
+      set({ 
+        preferences: defaultPreferences, 
+        isLoading: false,
+        error: 'Failed to load settings. Using defaults.'
+      });
+      
+      // Clear error after 5 seconds
+      setTimeout(() => {
+        set({ error: null });
+      }, 5000);
     }
   },
 
   savePreferences: async () => {
     try {
-      await AsyncStorage.setItem('user_preferences', JSON.stringify(get().preferences));
+      const preferences = get().preferences;
+      await AsyncStorage.setItem('user_preferences', JSON.stringify(preferences));
+      console.log('Settings saved successfully');
     } catch (error) {
       console.error('Failed to save preferences:', error);
-      throw error;
+      throw new Error('Failed to save settings to storage');
     }
   },
 

@@ -1,24 +1,34 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Text, Chip, Button, FAB } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { useTaskStore } from '@/stores/taskStore';
 import { TaskList } from '@/components/TaskList';
+import { TaskStatus, TaskStatusType } from '@/types/task';
 import { colors } from '@/constants/colors';
 
 export default function TasksScreen() {
   const router = useRouter();
   const { tasks, getTasks } = useTaskStore();
-  const [filter, setFilter] = useState<'all' | 'pending' | 'completed' | 'in-progress'>('all');
+  const [filter, setFilter] = useState<'all' | TaskStatusType>('all');
 
   useEffect(() => {
     getTasks();
   }, []);
 
-  const filteredTasks = tasks.filter(task => {
-    if (filter === 'all') return true;
-    return task.status === filter;
-  });
+  // Memoized filter calculations for better performance
+  const taskCounts = useMemo(() => ({
+    all: tasks.length,
+    pending: tasks.filter(t => t.status === TaskStatus.PENDING).length,
+    'in-progress': tasks.filter(t => t.status === TaskStatus.IN_PROGRESS).length,
+    paused: tasks.filter(t => t.status === TaskStatus.PAUSED).length,
+    completed: tasks.filter(t => t.status === TaskStatus.COMPLETED).length,
+  }), [tasks]);
+
+  const filteredTasks = useMemo(() => {
+    if (filter === 'all') return tasks;
+    return tasks.filter(task => task.status === filter);
+  }, [tasks, filter]);
 
   const getFilterColor = (filterType: string) => {
     return filter === filterType ? colors.primary[600] : colors.text.secondary.light;
@@ -30,13 +40,6 @@ export default function TasksScreen() {
         <Text variant="headlineMedium" style={styles.title}>
           All Tasks
         </Text>
-        <Button
-          mode="contained"
-          onPress={() => router.push('chat')}
-          icon="plus"
-        >
-          Add Task
-        </Button>
       </View>
 
       {/* Filter Chips */}
@@ -47,31 +50,39 @@ export default function TasksScreen() {
           style={styles.filterChip}
           textStyle={{ color: getFilterColor('all') }}
         >
-          All ({tasks.length})
+          All ({taskCounts.all})
         </Chip>
         <Chip
-          mode={filter === 'pending' ? 'flat' : 'outlined'}
-          onPress={() => setFilter('pending')}
+          mode={filter === TaskStatus.PENDING ? 'flat' : 'outlined'}
+          onPress={() => setFilter(TaskStatus.PENDING)}
           style={styles.filterChip}
-          textStyle={{ color: getFilterColor('pending') }}
+          textStyle={{ color: getFilterColor(TaskStatus.PENDING) }}
         >
-          Pending ({tasks.filter(t => t.status === 'pending').length})
+          Pending ({taskCounts.pending})
         </Chip>
         <Chip
-          mode={filter === 'in-progress' ? 'flat' : 'outlined'}
-          onPress={() => setFilter('in-progress')}
+          mode={filter === TaskStatus.IN_PROGRESS ? 'flat' : 'outlined'}
+          onPress={() => setFilter(TaskStatus.IN_PROGRESS)}
           style={styles.filterChip}
-          textStyle={{ color: getFilterColor('in-progress') }}
+          textStyle={{ color: getFilterColor(TaskStatus.IN_PROGRESS) }}
         >
-          In Progress ({tasks.filter(t => t.status === 'in-progress').length})
+          In Progress ({taskCounts['in-progress']})
         </Chip>
         <Chip
-          mode={filter === 'completed' ? 'flat' : 'outlined'}
-          onPress={() => setFilter('completed')}
+          mode={filter === TaskStatus.PAUSED ? 'flat' : 'outlined'}
+          onPress={() => setFilter(TaskStatus.PAUSED)}
           style={styles.filterChip}
-          textStyle={{ color: getFilterColor('completed') }}
+          textStyle={{ color: getFilterColor(TaskStatus.PAUSED) }}
         >
-          Completed ({tasks.filter(t => t.status === 'completed').length})
+          Paused ({taskCounts.paused})
+        </Chip>
+        <Chip
+          mode={filter === TaskStatus.COMPLETED ? 'flat' : 'outlined'}
+          onPress={() => setFilter(TaskStatus.COMPLETED)}
+          style={styles.filterChip}
+          textStyle={{ color: getFilterColor(TaskStatus.COMPLETED) }}
+        >
+          Completed ({taskCounts.completed})
         </Chip>
       </View>
 
@@ -96,14 +107,6 @@ export default function TasksScreen() {
                 : `No ${filter} tasks found`
               }
             </Text>
-            <Button
-              mode="contained"
-              onPress={() => router.push('chat')}
-              style={styles.emptyButton}
-              icon="plus"
-            >
-              Add Task
-            </Button>
           </View>
         )}
       </View>
@@ -125,7 +128,7 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     alignItems: 'center',
     padding: 16,
     paddingTop: 60,
@@ -161,9 +164,6 @@ const styles = StyleSheet.create({
     color: colors.text.secondary.light,
     textAlign: 'center',
     marginBottom: 24,
-  },
-  emptyButton: {
-    marginTop: 16,
   },
   fab: {
     position: 'absolute',
