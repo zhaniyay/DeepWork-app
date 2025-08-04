@@ -13,7 +13,7 @@ A intelligent productivity app that helps you focus on one task at a time with A
 -  **Performance Optimized** - React.memo, useMemo, useCallback for smooth experience
 
 ## 📱 Screenshots
-<div style="display: flex; flex-wrap: wrap; gap: 10px;"> <img src="https://github.com/user-attachments/assets/70bef848-d26f-4d8f-93d7-1088f5fbcaa1" width="250" /> <img src="https://github.com/user-attachments/assets/b7e85c8b-b81b-419f-8b87-c5d5f53957c3" width="250" /> <img src="https://github.com/user-attachments/assets/dbd2ded7-3381-4fde-be91-46d874730ce5" width="250" /> <img src="https://github.com/user-attachments/assets/1d2dd9f7-005d-4b04-a581-ca1da01f0fd5" width="250" /> <img src="https://github.com/user-attachments/assets/62ab2245-20b2-4ffa-9c52-d88aec5ba3ee" width="250" /> </div>
+<div style="display: flex; flex-wrap: wrap; gap: 10px;"> <img src="https://github.com/user-attachments/assets/70bef848-d26f-4d8f-93d7-1088f5fbcaa1" width="250" /> <img src="https://github.com/user-attachments/assets/b7e85c8b-b81b-419f-8b87-c5d5f53957c3" width="250" /> <img src="https://github.com/user-attachments/assets/dbd2ded7-3381-4fde-be91-46d874730ce5" width="250" /> </div>
 
 ```sh
 npx create-expo-app -e with-router
