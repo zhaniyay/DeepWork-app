@@ -92,7 +92,8 @@ export default function TasksScreen() {
           <TaskList 
             onTaskSelect={(task) => {
               useTaskStore.getState().selectTask(task);
-              router.push('focus/25');
+              // Let the focus screen use the task's estimated time instead of hardcoding 25
+              router.push('focus/0');
             }}
             showCompleted={filter === 'all' || filter === 'completed'}
           />

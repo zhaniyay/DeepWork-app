@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { View, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { Text, TextInput, Card, Avatar, Chip, IconButton } from 'react-native-paper';
 import { EnhancedAIService } from '@/services/ai/enhancedAIService';
@@ -30,7 +30,6 @@ interface EnhancedAIChatInterfaceProps {
 
 export const EnhancedAIChatInterface: React.FC<EnhancedAIChatInterfaceProps> = ({
   onTaskCreated,
-  onClose,
   onStartFocusSession,
 }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -71,11 +70,11 @@ export const EnhancedAIChatInterface: React.FC<EnhancedAIChatInterfaceProps> = (
         mostProductiveTime: 'morning',
         commonTags: Array.from(new Set(currentTasks.flatMap(task => task.tags))),
         averageTaskDuration: currentTasks.length > 0 
-          ? currentTasks.reduce((sum, task) => sum + task.estimated_minutes, 0) / currentTasks.length
+          ? currentTasks.reduce((sum, task) => sum + (task.estimated_minutes || 30), 0) / currentTasks.length
           : 30,
       },
       userPreferences: {
-        aiTone: preferences.aiTone || 'motivational',
+        aiTone: 'motivational',
         notificationPreferences: preferences.notifications,
         focusPreferences: preferences,
       },
@@ -128,9 +127,9 @@ export const EnhancedAIChatInterface: React.FC<EnhancedAIChatInterfaceProps> = (
           await createTask({
             title: task.title,
             description: task.description,
-            estimated_minutes: task.estimated_minutes,
-            priority_score: task.priority_score,
-            tags: task.tags,
+            priority_score: task.priority_score || 50,
+            estimated_minutes: task.estimated_minutes || 30,
+            tags: task.tags || [],
             due_date: task.due_date,
           });
         }
@@ -138,18 +137,20 @@ export const EnhancedAIChatInterface: React.FC<EnhancedAIChatInterfaceProps> = (
       }
 
       if (response.actions && response.actions.length > 0) {
-        handleActions(response.actions);
+        await handleActions(response.actions);
       }
-
     } catch (error) {
       console.error('Enhanced AI chat error:', error);
+      
+      // Provide a helpful error message to the user
       const errorMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: 'I apologize, but I\'m having trouble processing your request right now. Please try again.',
+        content: 'I\'m having trouble connecting right now, but I can still help you! Try saying something like "Create a task to write a report" or "Start a 25-minute focus session".',
         timestamp: new Date(),
-        suggestions: ['Try again', 'Add task manually'],
+        suggestions: ['Create task', 'Start focus session', 'Get help'],
       };
+
       setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
@@ -158,20 +159,120 @@ export const EnhancedAIChatInterface: React.FC<EnhancedAIChatInterfaceProps> = (
 
   const handleActions = async (actions: string[]) => {
     for (const action of actions) {
-      switch (action) {
-        case 'start_focus_session':
-          onStartFocusSession?.(preferences.sessionLength || 25);
-          break;
-        case 'prioritize_tasks':
-          break;
-        case 'break_down_project':
-          break;
-        case 'take_break':
-          break;
-        case 'review_progress':
-          break;
+      if (action.includes('create_task')) {
+        const taskData = extractTaskFromAction(action);
+        if (taskData) {
+          await createTask(taskData);
+          onTaskCreated?.();
+        }
+      } else if (action.includes('start_focus_session')) {
+        const duration = extractDurationFromAction(action);
+        onStartFocusSession?.(duration);
       }
     }
+  };
+
+  // Add missing task creation handler
+  const handleTaskCreation = useCallback(async (taskData: {
+    title: string;
+    description?: string;
+    priority_score?: number;
+    estimated_minutes?: number;
+    tags?: string[];
+  }) => {
+    try {
+      const newTask = await createTask({
+        title: taskData.title,
+        description: taskData.description,
+        priority_score: taskData.priority_score || 50,
+        estimated_minutes: taskData.estimated_minutes || 30,
+        tags: taskData.tags || [],
+        due_date: undefined,
+      });
+
+      onTaskCreated?.();
+
+      // Add confirmation message
+      setMessages(prev => [...prev, {
+        id: Date.now().toString(),
+        role: 'assistant',
+        content: `Great! I've created a task: "${taskData.title}". You can start working on it now or add more tasks.`,
+        timestamp: new Date(),
+      }]);
+
+      return newTask;
+    } catch (error) {
+      console.error('Failed to create task:', error);
+      setMessages(prev => [...prev, {
+        id: Date.now().toString(),
+        role: 'assistant',
+        content: 'Sorry, I encountered an error while creating your task. Please try again.',
+        timestamp: new Date(),
+      }]);
+      throw error;
+    }
+  }, [createTask, onTaskCreated]);
+
+  // Add missing focus session handler
+  const handleFocusSession = useCallback(async (duration: number) => {
+    try {
+      const nextTask = useTaskStore.getState().getNextTask();
+      
+      if (nextTask) {
+        useTaskStore.getState().selectTask(nextTask);
+        onStartFocusSession?.(duration);
+        
+        setMessages(prev => [...prev, {
+          id: Date.now().toString(),
+          role: 'assistant',
+          content: `Perfect! Starting a ${duration}-minute focus session for: "${nextTask.title}". Good luck!`,
+          timestamp: new Date(),
+        }]);
+      } else {
+        setMessages(prev => [...prev, {
+          id: Date.now().toString(),
+          role: 'assistant',
+          content: 'You don\'t have any pending tasks. Let\'s create one first!',
+          timestamp: new Date(),
+        }]);
+      }
+    } catch (error) {
+      console.error('Failed to start focus session:', error);
+      setMessages(prev => [...prev, {
+        id: Date.now().toString(),
+        role: 'assistant',
+        content: 'Sorry, I encountered an error while starting your focus session. Please try again.',
+        timestamp: new Date(),
+      }]);
+    }
+  }, [onStartFocusSession]);
+
+  const extractTaskFromAction = (action: string) => {
+    // Extract task data from action string
+    const titleMatch = action.match(/create_task\s+(.+?)(?:\s+for\s+(\d+)\s*min|$)/i);
+    const durationMatch = action.match(/(\d+)\s*min/i);
+    const priorityMatch = action.match(/priority\s*(\d+)/i);
+    
+    if (titleMatch) {
+      return {
+        title: titleMatch[1]?.trim() || 'New Task',
+        description: action.includes('description') ? action.split('description')[1]?.trim() : undefined,
+        estimated_minutes: durationMatch ? parseInt(durationMatch[1]) : 30,
+        priority_score: priorityMatch ? parseInt(priorityMatch[1]) : 50,
+        tags: extractTagsFromAction(action),
+      };
+    }
+    return null;
+  };
+
+  const extractDurationFromAction = (action: string): number => {
+    const match = action.match(/(\d+)\s*(?:min|minute|minutes)/i);
+    return match ? parseInt(match[1]) : preferences.sessionLength || 25;
+  };
+
+  const extractTagsFromAction = (action: string): string[] => {
+    const tagMatches = action.match(/#(\w+)/g);
+    return tagMatches ? tagMatches.map(tag => tag.slice(1)) : [];
   };
 
   const handleQuickAction = async (action: string) => {
@@ -253,15 +354,20 @@ export const EnhancedAIChatInterface: React.FC<EnhancedAIChatInterfaceProps> = (
   );
 
   return (
-    <View style={styles.container}>
-      {/* Simple Header */}
+    <KeyboardAvoidingView 
+      style={styles.container} 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
       <View style={styles.header}>
-        <Text variant="titleMedium" style={styles.headerTitle}>
+        <Text variant="titleLarge" style={styles.headerTitle}>
           AI Assistant
         </Text>
-        {onClose && (
-          <IconButton icon="close" onPress={onClose} size={24} />
-        )}
+        <IconButton
+          icon="close"
+          size={24}
+          onPress={() => {/* Handle close if needed */}}
+          iconColor={colors.text.secondary.light}
+        />
       </View>
 
       <KeyboardAvoidingView
@@ -305,7 +411,7 @@ export const EnhancedAIChatInterface: React.FC<EnhancedAIChatInterfaceProps> = (
           />
         </View>
       </KeyboardAvoidingView>
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 

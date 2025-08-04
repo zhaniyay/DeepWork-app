@@ -1,8 +1,7 @@
 import React, { useEffect, useMemo } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
-import { Text, Card, ProgressBar, Chip, Button } from 'react-native-paper';
+import { Text, Card, ProgressBar, Button, Divider } from 'react-native-paper';
 import { useRouter } from 'expo-router';
-import { useProgressStore } from '@/stores/progressStore';
 import { useTaskStore } from '@/stores/taskStore';
 import { TaskStatus } from '@/types/task';
 import { colors } from '@/constants/colors';
@@ -12,104 +11,85 @@ interface ProgressDashboardProps {
   onViewAnalytics?: () => void;
 }
 
-export const ProgressDashboard: React.FC<ProgressDashboardProps> = ({
+export const ProgressDashboard: React.FC<ProgressDashboardProps> = React.memo(({
   onViewSessions,
   onViewAnalytics,
 }) => {
-  const { stats, isLoading, getProgressStats } = useProgressStore();
-  const { tasks, markTaskInProgress, selectTask } = useTaskStore();
+  const { tasks } = useTaskStore();
   const router = useRouter();
 
-  useEffect(() => {
-    getProgressStats();
-  }, []);
+  // Calculate simple, meaningful stats with useMemo
+  const stats = useMemo(() => {
+    const totalTasks = tasks.length;
+    const completedTasks = tasks.filter(task => task.status === TaskStatus.COMPLETED).length;
+    const inProgressTasks = tasks.filter(task => task.status === TaskStatus.IN_PROGRESS).length;
+    const pausedTasks = tasks.filter(task => task.status === TaskStatus.PAUSED).length;
+    const pendingTasks = tasks.filter(task => task.status === TaskStatus.PENDING).length;
+    
+    const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+    
+    return {
+      totalTasks,
+      completedTasks,
+      inProgressTasks,
+      pausedTasks,
+      pendingTasks,
+      completionRate,
+    };
+  }, [tasks]);
 
-  // Filter tasks for progress display
-  const pausedTasks = useMemo(() => 
-    tasks.filter(task => task.status === TaskStatus.PAUSED),
+  // Memoize filtered tasks for better performance
+  const pausedTasksList = useMemo(() => 
+    tasks.filter(task => task.status === TaskStatus.PAUSED).slice(0, 3),
     [tasks]
   );
 
-  const recentCompleted = useMemo(() => 
-    tasks.filter(task => 
-      task.status === TaskStatus.COMPLETED && 
-      new Date(task.updated_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-    ),
+  const completedTasksList = useMemo(() => 
+    tasks.filter(task => task.status === TaskStatus.COMPLETED).slice(0, 3),
     [tasks]
   );
 
-  const upcomingTasks = useMemo(() => 
-    tasks
-      .filter(task => task.status === TaskStatus.PENDING)
-      .sort((a, b) => b.priority_score - a.priority_score)
-      .slice(0, 3),
-    [tasks]
-  );
-
-  const formatTime = (minutes: number) => {
+  const formatTime = useMemo(() => (minutes: number) => {
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
     return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
-  };
+  }, []);
 
-  const getProductivityColor = (score: number) => {
-    if (score >= 80) return colors.success.primary;
-    if (score >= 60) return colors.warning.primary;
-    return colors.error.primary;
-  };
-
-  const getStreakEmoji = (streak: number) => {
-    if (streak >= 7) return '🔥';
-    if (streak >= 3) return '⚡';
-    return '💪';
-  };
-
-  const getPriorityColor = (priority: number) => {
-    if (priority >= 80) return colors.error.primary;
-    if (priority >= 60) return colors.warning.primary;
-    return colors.success.primary;
-  };
-
-  const getPriorityText = (priority: number) => {
-    if (priority >= 80) return 'High';
-    if (priority >= 60) return 'Medium';
-    return 'Low';
-  };
-
-  const handleResumeTask = async (task: any) => {
+  const handleResumeTask = useMemo(() => async (task: any) => {
     try {
-      // Mark task as in progress
-      await markTaskInProgress(task.id);
-      // Select the task for focus session
-      selectTask(task);
-      // Navigate to focus session
-      router.push('focus/25');
+      await useTaskStore.getState().markTaskInProgress(task.id);
+      useTaskStore.getState().selectTask(task);
+      // Use task's estimated time or default to 25 minutes
+      const duration = task.estimated_minutes || 25;
+      router.push(`focus/${duration}`);
     } catch (error) {
       console.error('Failed to resume task:', error);
     }
-  };
+  }, [router]);
 
-  if (isLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <Text variant="bodyLarge" style={styles.loadingText}>
-          Loading progress...
-        </Text>
-      </View>
-    );
-  }
+  const handleStartFocusSession = useMemo(() => () => {
+    const nextTask = tasks.find(task => task.status === TaskStatus.PENDING);
+    if (nextTask) {
+      useTaskStore.getState().selectTask(nextTask);
+      // Use task's estimated time or default to 25 minutes
+      const duration = nextTask.estimated_minutes || 25;
+      router.push(`focus/${duration}`);
+    } else {
+      router.push('chat');
+    }
+  }, [tasks, router]);
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Overview Stats */}
+      {/* Simple Overview Stats */}
       <View style={styles.statsGrid}>
         <Card style={styles.statCard}>
           <Card.Content>
             <Text variant="headlineSmall" style={styles.statNumber}>
-              {stats.totalSessions}
+              {stats.totalTasks}
             </Text>
             <Text variant="bodyMedium" style={styles.statLabel}>
-              Total Sessions
+              Total Tasks
             </Text>
           </Card.Content>
         </Card>
@@ -117,10 +97,10 @@ export const ProgressDashboard: React.FC<ProgressDashboardProps> = ({
         <Card style={styles.statCard}>
           <Card.Content>
             <Text variant="headlineSmall" style={styles.statNumber}>
-              {formatTime(stats.totalFocusTime)}
+              {stats.completedTasks}
             </Text>
             <Text variant="bodyMedium" style={styles.statLabel}>
-              Focus Time
+              Completed
             </Text>
           </Card.Content>
         </Card>
@@ -128,10 +108,10 @@ export const ProgressDashboard: React.FC<ProgressDashboardProps> = ({
         <Card style={styles.statCard}>
           <Card.Content>
             <Text variant="headlineSmall" style={styles.statNumber}>
-              {formatTime(stats.averageSessionLength)}
+              {stats.inProgressTasks}
             </Text>
             <Text variant="bodyMedium" style={styles.statLabel}>
-              Avg Session
+              In Progress
             </Text>
           </Card.Content>
         </Card>
@@ -139,7 +119,7 @@ export const ProgressDashboard: React.FC<ProgressDashboardProps> = ({
         <Card style={styles.statCard}>
           <Card.Content>
             <Text variant="headlineSmall" style={styles.statNumber}>
-              {Math.round(stats.completionRate)}%
+              {stats.completionRate}%
             </Text>
             <Text variant="bodyMedium" style={styles.statLabel}>
               Completion Rate
@@ -148,169 +128,160 @@ export const ProgressDashboard: React.FC<ProgressDashboardProps> = ({
         </Card>
       </View>
 
-      {/* Paused Tasks Section */}
-      {pausedTasks.length > 0 && (
+      {/* Quick Actions */}
+      <Card style={styles.actionsCard}>
+        <Card.Content>
+          <Text variant="titleMedium" style={styles.cardTitle}>
+            Quick Actions
+          </Text>
+          <View style={styles.actionButtons}>
+            <Button
+              mode="contained"
+              onPress={handleStartFocusSession}
+              style={styles.actionButton}
+              icon="play"
+            >
+              Start Focus Session
+            </Button>
+            <Button
+              mode="outlined"
+              onPress={() => router.push('chat')}
+              style={styles.actionButton}
+              icon="plus"
+            >
+              Add New Task
+            </Button>
+          </View>
+        </Card.Content>
+      </Card>
+
+      {/* Paused Tasks - Only show if there are any */}
+      {stats.pausedTasks > 0 && (
         <Card style={styles.tasksCard}>
           <Card.Content>
-            <Text variant="titleMedium" style={styles.tasksTitle}>
-              Paused Tasks ({pausedTasks.length})
+            <Text variant="titleMedium" style={styles.cardTitle}>
+              Paused Tasks ({stats.pausedTasks})
             </Text>
-            {pausedTasks.map((task) => (
-                              <View key={task.id} style={styles.taskItem}>
-                  <View style={styles.taskHeader}>
-                    <Text variant="bodyLarge" style={styles.taskTitle}>
-                      ⏸️ {task.title}
-                    </Text>
-                  <Chip 
-                    mode="outlined" 
-                    style={[
-                      styles.priorityChip, 
-                      { borderColor: getPriorityColor(task.priority_score) }
-                    ]}
-                    textStyle={{ color: getPriorityColor(task.priority_score) }}
-                  >
-                    {getPriorityText(task.priority_score)}
-                  </Chip>
+            {pausedTasksList.map((task) => (
+              <View key={task.id} style={styles.taskItem}>
+                <View style={styles.taskHeader}>
+                  <Text variant="bodyLarge" style={styles.taskTitle}>
+                    ⏸️ {task.title}
+                  </Text>
                 </View>
                 {task.description && (
                   <Text variant="bodySmall" style={styles.taskDescription}>
                     {task.description}
                   </Text>
                 )}
-                <View style={styles.taskProgress}>
-                  <Text variant="bodySmall" style={styles.taskTime}>
-                    ⏱️ {task.estimated_minutes || 30}m estimated
-                  </Text>
-                  <ProgressBar 
-                    progress={0.3} // TODO: Calculate actual progress
-                    color={colors.warning.primary}
-                    style={styles.taskProgressBar}
-                  />
-                  <Text variant="bodySmall" style={styles.progressText}>
-                    30% complete (paused)
-                  </Text>
-                  <Button
-                    mode="contained"
-                    onPress={() => handleResumeTask(task)}
-                    style={styles.resumeButton}
-                    icon="play"
-                  >
-                    Resume Task
-                  </Button>
-                </View>
+                <Button
+                  mode="contained"
+                  onPress={() => handleResumeTask(task)}
+                  style={styles.resumeButton}
+                  icon="play"
+                >
+                  Resume
+                </Button>
               </View>
             ))}
           </Card.Content>
         </Card>
       )}
 
-      {/* Streak Section */}
-      <Card style={styles.streakCard}>
-        <Card.Content>
-          <View style={styles.streakHeader}>
-            <Text variant="titleLarge" style={styles.streakTitle}>
-              {getStreakEmoji(stats.currentStreak)} {stats.currentStreak} Day Streak
+      {/* Recent Completed Tasks */}
+      {stats.completedTasks > 0 && (
+        <Card style={styles.tasksCard}>
+          <Card.Content>
+            <Text variant="titleMedium" style={styles.cardTitle}>
+              Recently Completed
             </Text>
-            <Chip mode="outlined" style={styles.streakChip}>
-              Best: {stats.longestStreak} days
-            </Chip>
-          </View>
-          <Text variant="bodyMedium" style={styles.streakDescription}>
-            Keep up the great work! Consistency is key to building lasting productivity habits.
-          </Text>
-        </Card.Content>
-      </Card>
-
-      {/* Productivity Score */}
-      <Card style={styles.productivityCard}>
-        <Card.Content>
-          <Text variant="titleMedium" style={styles.productivityTitle}>
-            Productivity Score
-          </Text>
-          <View style={styles.productivityContent}>
-            <Text variant="displaySmall" style={[styles.productivityScore, { color: getProductivityColor(stats.productivityScore) }]}>
-              {Math.round(stats.productivityScore)}
-            </Text>
-            <Text variant="bodyMedium" style={styles.productivityLabel}>
-              / 100
-            </Text>
-          </View>
-          <ProgressBar 
-            progress={stats.productivityScore / 100} 
-            color={getProductivityColor(stats.productivityScore)}
-            style={styles.productivityBar}
-          />
-          <Text variant="bodySmall" style={styles.productivityDescription}>
-            Based on session completion, focus quality, and consistency
-          </Text>
-        </Card.Content>
-      </Card>
-
-      {/* Weekly Focus Chart */}
-      <Card style={styles.chartCard}>
-        <Card.Content>
-          <Text variant="titleMedium" style={styles.chartTitle}>
-            This Week's Focus Time
-          </Text>
-          <View style={styles.chartContainer}>
-            {stats.weeklyFocusTime.map((time, index) => (
-              <View key={index} style={styles.chartBar}>
-                <View 
-                  style={[
-                    styles.bar, 
-                    { 
-                      height: Math.max(20, (time / Math.max(...stats.weeklyFocusTime)) * 100),
-                      backgroundColor: colors.primary[600]
-                    }
-                  ]} 
-                />
-                <Text variant="bodySmall" style={styles.barLabel}>
-                  {formatTime(time)}
-                </Text>
-                <Text variant="bodySmall" style={styles.dayLabel}>
-                  {['S', 'M', 'T', 'W', 'T', 'F', 'S'][index]}
-                </Text>
+            {completedTasksList.map((task) => (
+              <View key={task.id} style={styles.taskItem}>
+                <View style={styles.taskHeader}>
+                  <Text variant="bodyLarge" style={styles.taskTitle}>
+                    ✅ {task.title}
+                  </Text>
+                </View>
+                {task.description && (
+                  <Text variant="bodySmall" style={styles.taskDescription}>
+                    {task.description}
+                  </Text>
+                )}
               </View>
             ))}
-          </View>
-        </Card.Content>
-      </Card>
+          </Card.Content>
+        </Card>
+      )}
 
-      {/* Action Buttons */}
-      <View style={styles.actionButtons}>
-        <Button
-          mode="contained"
-          onPress={onViewSessions}
-          style={styles.actionButton}
-          icon="history"
-        >
-          View Sessions
-        </Button>
-        <Button
-          mode="outlined"
-          onPress={onViewAnalytics}
-          style={styles.actionButton}
-          icon="chart-line"
-        >
-          Detailed Analytics
-        </Button>
-      </View>
+      {/* Empty State */}
+      {stats.totalTasks === 0 && (
+        <Card style={styles.emptyCard}>
+          <Card.Content>
+            <Text variant="titleMedium" style={styles.emptyTitle}>
+              No Tasks Yet
+            </Text>
+            <Text variant="bodyMedium" style={styles.emptyDescription}>
+              Start by adding your first task to track your progress.
+            </Text>
+            <Button
+              mode="contained"
+              onPress={() => router.push('chat')}
+              style={styles.emptyButton}
+              icon="plus"
+            >
+              Add Your First Task
+            </Button>
+          </Card.Content>
+        </Card>
+      )}
+
+      {/* Progress Overview */}
+      {stats.totalTasks > 0 && (
+        <Card style={styles.progressCard}>
+          <Card.Content>
+            <Text variant="titleMedium" style={styles.cardTitle}>
+              Progress Overview
+            </Text>
+            <View style={styles.progressItem}>
+              <Text variant="bodyMedium">Pending</Text>
+              <Text variant="bodyLarge" style={styles.progressNumber}>
+                {stats.pendingTasks}
+              </Text>
+            </View>
+            <Divider style={styles.divider} />
+            <View style={styles.progressItem}>
+              <Text variant="bodyMedium">In Progress</Text>
+              <Text variant="bodyLarge" style={styles.progressNumber}>
+                {stats.inProgressTasks}
+              </Text>
+            </View>
+            <Divider style={styles.divider} />
+            <View style={styles.progressItem}>
+              <Text variant="bodyMedium">Completed</Text>
+              <Text variant="bodyLarge" style={styles.progressNumber}>
+                {stats.completedTasks}
+              </Text>
+            </View>
+            <Divider style={styles.divider} />
+            <View style={styles.progressItem}>
+              <Text variant="bodyMedium">Completion Rate</Text>
+              <Text variant="bodyLarge" style={styles.progressNumber}>
+                {stats.completionRate}%
+              </Text>
+            </View>
+          </Card.Content>
+        </Card>
+      )}
     </ScrollView>
   );
-};
+});
+
+ProgressDashboard.displayName = 'ProgressDashboard';
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 16,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    color: colors.text.secondary.light,
   },
   statsGrid: {
     flexDirection: 'row',
@@ -321,7 +292,9 @@ const styles = StyleSheet.create({
   statCard: {
     flex: 1,
     minWidth: '45%',
-    elevation: 2,
+    elevation: 1,
+    backgroundColor: colors.surface.primary,
+    borderRadius: 12,
   },
   statNumber: {
     color: colors.primary[600],
@@ -333,107 +306,30 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 4,
   },
-  streakCard: {
+  actionsCard: {
     marginBottom: 16,
-    elevation: 2,
+    elevation: 1,
+    backgroundColor: colors.surface.primary,
+    borderRadius: 12,
   },
-  streakHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  streakTitle: {
-    color: colors.text.primary.light,
-    fontWeight: 'bold',
-  },
-  streakChip: {
-    backgroundColor: colors.surface.secondary,
-  },
-  streakDescription: {
-    color: colors.text.secondary.light,
-  },
-  productivityCard: {
-    marginBottom: 16,
-    elevation: 2,
-  },
-  productivityTitle: {
-    color: colors.text.primary.light,
-    fontWeight: 'bold',
-    marginBottom: 12,
-  },
-  productivityContent: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'center',
-    marginBottom: 12,
-  },
-  productivityScore: {
-    fontWeight: 'bold',
-  },
-  productivityLabel: {
-    color: colors.text.secondary.light,
-    marginLeft: 4,
-  },
-  productivityBar: {
-    marginBottom: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  productivityDescription: {
-    color: colors.text.secondary.light,
-    textAlign: 'center',
-  },
-  chartCard: {
-    marginBottom: 16,
-    elevation: 2,
-  },
-  chartTitle: {
+  cardTitle: {
     color: colors.text.primary.light,
     fontWeight: 'bold',
     marginBottom: 16,
-  },
-  chartContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    height: 120,
-  },
-  chartBar: {
-    flex: 1,
-    alignItems: 'center',
-    marginHorizontal: 2,
-  },
-  bar: {
-    width: 20,
-    borderRadius: 2,
-    marginBottom: 4,
-  },
-  barLabel: {
-    color: colors.text.secondary.light,
-    textAlign: 'center',
-    marginBottom: 2,
-  },
-  dayLabel: {
-    color: colors.text.secondary.light,
-    fontWeight: 'bold',
   },
   actionButtons: {
     flexDirection: 'row',
     gap: 12,
-    marginBottom: 16,
   },
   actionButton: {
     flex: 1,
+    borderRadius: 8,
   },
   tasksCard: {
     marginBottom: 16,
-    elevation: 2,
-  },
-  tasksTitle: {
-    color: colors.text.primary.light,
-    fontWeight: 'bold',
-    marginBottom: 12,
+    elevation: 1,
+    backgroundColor: colors.surface.primary,
+    borderRadius: 12,
   },
   taskItem: {
     marginBottom: 16,
@@ -442,40 +338,61 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.surface.secondary,
   },
   taskHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
     marginBottom: 8,
   },
   taskTitle: {
     color: colors.text.primary.light,
     flex: 1,
-    marginRight: 8,
   },
   taskDescription: {
     color: colors.text.secondary.light,
     marginBottom: 8,
   },
-  taskProgress: {
-    marginTop: 8,
-  },
-  taskTime: {
-    color: colors.text.secondary.light,
-    marginBottom: 4,
-  },
-  taskProgressBar: {
-    marginBottom: 4,
-    height: 6,
-    borderRadius: 3,
-  },
-  progressText: {
-    color: colors.text.secondary.light,
-    textAlign: 'center',
-  },
-  priorityChip: {
-    backgroundColor: colors.surface.secondary,
-  },
   resumeButton: {
     marginTop: 8,
+    backgroundColor: colors.primary[600],
+    borderRadius: 8,
   },
-}); 
+  emptyCard: {
+    marginBottom: 16,
+    elevation: 1,
+    backgroundColor: colors.surface.primary,
+    borderRadius: 12,
+  },
+  emptyTitle: {
+    color: colors.text.primary.light,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  emptyDescription: {
+    color: colors.text.secondary.light,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  emptyButton: {
+    marginTop: 8,
+    backgroundColor: colors.primary[600],
+    borderRadius: 8,
+  },
+  progressCard: {
+    marginBottom: 16,
+    elevation: 1,
+    backgroundColor: colors.surface.primary,
+    borderRadius: 12,
+  },
+  progressItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  progressNumber: {
+    color: colors.primary[600],
+    fontWeight: 'bold',
+  },
+  divider: {
+    marginVertical: 4,
+    backgroundColor: colors.surface.secondary,
+  },
+});

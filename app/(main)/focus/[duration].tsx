@@ -14,10 +14,24 @@ export default function FocusSessionScreen() {
   const [sessionDuration, setSessionDuration] = useState(25); // default 25 minutes
 
   useEffect(() => {
-    if (duration) {
-      setSessionDuration(parseInt(duration));
+    // Priority: 1. Task's estimated time, 2. URL parameter, 3. Default 25 minutes
+    let finalDuration = 25;
+    
+    if (selectedTask?.estimated_minutes) {
+      finalDuration = selectedTask.estimated_minutes;
+    } else if (duration) {
+      finalDuration = parseInt(duration);
     }
-  }, [duration]);
+    
+    console.log('Focus Session Duration Debug:', {
+      taskEstimated: selectedTask?.estimated_minutes,
+      urlDuration: duration,
+      finalDuration,
+      taskTitle: selectedTask?.title
+    });
+    
+    setSessionDuration(finalDuration);
+  }, [selectedTask, duration]);
 
   const handleSessionComplete = async (outcome: 'completed' | 'partial' | 'abandoned') => {
     setSessionOutcome(outcome);

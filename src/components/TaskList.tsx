@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { View, StyleSheet, FlatList } from 'react-native';
 import { Card, Text, Button, Chip, IconButton, Menu } from 'react-native-paper';
 import { useTaskStore } from '@/stores/taskStore';
@@ -11,7 +11,7 @@ interface TaskListProps {
   showCompleted?: boolean;
 }
 
-export const TaskList: React.FC<TaskListProps> = ({ 
+export const TaskList: React.FC<TaskListProps> = React.memo(({ 
   onTaskSelect, 
   showCompleted = false 
 }) => {
@@ -21,17 +21,22 @@ export const TaskList: React.FC<TaskListProps> = ({
   const [toastMessage, setToastMessage] = useState('');
   const [toastAction, setToastAction] = useState<{ label: string; onPress: () => void } | undefined>();
 
-  const filteredTasks = tasks.filter(task => 
-    showCompleted ? true : task.status !== TaskStatus.COMPLETED
+  // Memoize filtered tasks for better performance
+  const filteredTasks = useMemo(() => 
+    tasks.filter(task => 
+      showCompleted ? true : task.status !== TaskStatus.COMPLETED
+    ),
+    [tasks, showCompleted]
   );
 
-  const getPriorityColor = (priority: number) => {
+  // Memoize utility functions
+  const getPriorityColor = useCallback((priority: number) => {
     if (priority >= 80) return colors.error.primary;
     if (priority >= 60) return colors.warning.primary;
     return colors.success.primary;
-  };
+  }, []);
 
-  const getStatusColor = (status: TaskStatusType) => {
+  const getStatusColor = useCallback((status: TaskStatusType) => {
     switch (status) {
       case TaskStatus.COMPLETED:
         return colors.success.primary;
@@ -44,9 +49,9 @@ export const TaskList: React.FC<TaskListProps> = ({
       default:
         return colors.text.primary.light;
     }
-  };
+  }, []);
 
-  const getStatusText = (status: TaskStatusType) => {
+  const getStatusText = useCallback((status: TaskStatusType) => {
     switch (status) {
       case TaskStatus.COMPLETED:
         return 'Completed';
@@ -59,9 +64,9 @@ export const TaskList: React.FC<TaskListProps> = ({
       default:
         return 'Pending';
     }
-  };
+  }, []);
 
-  const handleTaskAction = async (taskId: string, action: string) => {
+  const handleTaskAction = useCallback(async (taskId: string, action: string) => {
     setMenuVisible(null);
     
     try {
@@ -84,16 +89,14 @@ export const TaskList: React.FC<TaskListProps> = ({
       }
     } catch (error) {
       console.error('Task action failed:', error);
-      // Could add a toast notification here
     }
-  };
+  }, [markTaskComplete, markTaskInProgress, markTaskDeferred, deleteTask]);
 
-  const showPauseToast = (taskTitle: string) => {
+  const showPauseToast = useCallback((taskTitle: string) => {
     setToastMessage(`Task paused.`);
     setToastAction({
       label: 'Resume',
       onPress: () => {
-        // Find the paused task and resume it
         const pausedTask = tasks.find(t => t.title === taskTitle && t.status === TaskStatus.PAUSED);
         if (pausedTask) {
           handleTaskAction(pausedTask.id, 'resume');
@@ -102,9 +105,9 @@ export const TaskList: React.FC<TaskListProps> = ({
       },
     });
     setToastVisible(true);
-  };
+  }, [tasks, handleTaskAction]);
 
-  const renderTask = ({ item: task }: { item: Task }) => (
+  const renderTask = useCallback(({ item: task }: { item: Task }) => (
     <Card style={styles.taskCard} mode="outlined">
       <Card.Content>
         <View style={styles.taskHeader}>
@@ -157,7 +160,7 @@ export const TaskList: React.FC<TaskListProps> = ({
             <Menu.Item 
               onPress={() => handleTaskAction(task.id, 'defer')}
               title="Defer"
-                              leadingIcon="clock"
+              leadingIcon="clock"
             />
             <Menu.Item 
               onPress={() => handleTaskAction(task.id, 'delete')}
@@ -235,14 +238,16 @@ export const TaskList: React.FC<TaskListProps> = ({
         )}
       </Card.Content>
     </Card>
-  );
+  ), [menuVisible, handleTaskAction, getPriorityColor, getStatusColor, getStatusText, onTaskSelect]);
+
+  const keyExtractor = useCallback((item: Task) => item.id, []);
 
   return (
     <View style={styles.container}>
       <FlatList
         data={filteredTasks}
         renderItem={renderTask}
-        keyExtractor={(item) => item.id}
+        keyExtractor={keyExtractor}
         style={styles.listContainer}
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
@@ -255,7 +260,9 @@ export const TaskList: React.FC<TaskListProps> = ({
       />
     </View>
   );
-};
+});
+
+TaskList.displayName = 'TaskList';
 
 const styles = StyleSheet.create({
   container: {

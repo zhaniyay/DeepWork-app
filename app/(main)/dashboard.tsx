@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, FlatList } from 'react-native';
-import { Text, FAB, Card, Chip, Button } from 'react-native-paper';
+import { Text, FAB, Card, Chip, Button, IconButton } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '@/stores/authStore';
 import { useTaskStore } from '@/stores/taskStore';
 import { colors } from '@/constants/colors';
 import { QuickAddTask } from '@/components/QuickAddTask';
-import { TaskList } from '@/components/TaskList';
 
 export default function DashboardScreen() {
   const router = useRouter();
@@ -29,200 +28,258 @@ export default function DashboardScreen() {
     }
   };
 
-  return (
-    <View style={styles.container}>
-      <View style={styles.header}>
+  const pendingTasks = tasks.filter(t => t.status === 'pending');
+  const completedTasks = tasks.filter(t => t.status === 'completed');
+  const inProgressTasks = tasks.filter(t => t.status === 'in-progress');
+
+  // Render header section
+  const renderHeader = () => (
+    <View style={styles.header}>
+      <View style={styles.headerContent}>
         <Text variant="headlineMedium" style={styles.title}>
-          Focus Dashboard
+          Focus
         </Text>
+        <Text variant="bodyMedium" style={styles.subtitle}>
+          Welcome back, {user?.full_name || 'Focus Master'}
+        </Text>
+      </View>
+      <IconButton
+        icon="logout"
+        size={24}
+        onPress={handleSignOut}
+        disabled={isLoading}
+        iconColor={colors.primary[600]}
+      />
+    </View>
+  );
+
+  // Render stats section
+  const renderStats = () => (
+    <View style={styles.statsContainer}>
+      <Card style={styles.statCard}>
+        <Card.Content style={styles.statContent}>
+          <Text variant="headlineLarge" style={styles.statNumber}>
+            {pendingTasks.length}
+          </Text>
+          <Text variant="bodyMedium" style={styles.statLabel}>
+            Pending
+          </Text>
+        </Card.Content>
+      </Card>
+
+      <Card style={styles.statCard}>
+        <Card.Content style={styles.statContent}>
+          <Text variant="headlineLarge" style={styles.statNumber}>
+            {inProgressTasks.length}
+          </Text>
+          <Text variant="bodyMedium" style={styles.statLabel}>
+            In Progress
+          </Text>
+        </Card.Content>
+      </Card>
+
+      <Card style={styles.statCard}>
+        <Card.Content style={styles.statContent}>
+          <Text variant="headlineLarge" style={styles.statNumber}>
+            {completedTasks.length}
+          </Text>
+          <Text variant="bodyMedium" style={styles.statLabel}>
+            Completed
+          </Text>
+        </Card.Content>
+      </Card>
+    </View>
+  );
+
+  // Render actions section
+  const renderActions = () => (
+    <View style={styles.actionsContainer}>
+      <Button
+        mode="contained"
+        onPress={() => router.push('chat')}
+        style={styles.mainActionButton}
+        icon="robot"
+        contentStyle={styles.mainActionContent}
+      >
+        Start with AI
+      </Button>
+      
+      <View style={styles.secondaryActions}>
         <Button
-          mode="text"
-          onPress={handleSignOut}
-          loading={isLoading}
-          disabled={isLoading}
+          mode="outlined"
+          onPress={() => router.push('progress')}
+          style={styles.secondaryButton}
+          icon="chart-line"
         >
-          Sign Out
+          Progress
+        </Button>
+        <Button
+          mode="outlined"
+          onPress={() => router.push('tasks')}
+          style={styles.secondaryButton}
+          icon="format-list-bulleted"
+        >
+          All Tasks
+        </Button>
+        <Button
+          mode="outlined"
+          onPress={() => router.push('settings')}
+          style={styles.secondaryButton}
+          icon="cog"
+        >
+          Settings
         </Button>
       </View>
+    </View>
+  );
 
-      <FlatList
-        style={styles.content}
-        data={[{ key: 'dashboard' }]}
-        renderItem={() => (
-          <>
-            {/* Welcome Section */}
-            <Card style={styles.welcomeCard}>
-              <Card.Content>
-                <Text variant="titleLarge" style={styles.welcomeTitle}>
-                  Welcome back, {user?.full_name || 'Focus Master'}!
-                </Text>
-                <Text variant="bodyMedium" style={styles.welcomeSubtitle}>
-                  Ready to tackle your next priority task?
-                </Text>
-              </Card.Content>
-            </Card>
+  // Render quick add task section
+  const renderQuickAdd = () => (
+    <QuickAddTask onTaskAdded={getTasks} />
+  );
 
-            {/* Quick Stats */}
-            <View style={styles.statsContainer}>
-              <Card style={styles.statCard}>
+  // Render priority tasks section
+  const renderPriorityTasks = () => (
+    <Card style={styles.tasksCard}>
+      <Card.Content>
+        <View style={styles.sectionHeader}>
+          <Text variant="titleLarge" style={styles.sectionTitle}>
+            Priority Tasks
+          </Text>
+          <Text variant="bodySmall" style={styles.sectionSubtitle}>
+            {pendingTasks.length} tasks waiting
+          </Text>
+        </View>
+        
+        {tasks.length > 0 ? (
+          <View style={styles.taskListContainer}>
+            {pendingTasks.slice(0, 3).map((task) => (
+              <Card key={task.id} style={styles.taskItem} mode="outlined">
                 <Card.Content>
-                  <Text variant="headlineSmall" style={styles.statNumber}>
-                    {tasks.length}
-                  </Text>
-                  <Text variant="bodyMedium" style={styles.statLabel}>
-                    Total Tasks
-                  </Text>
-                </Card.Content>
-              </Card>
-
-              <Card style={styles.statCard}>
-                <Card.Content>
-                  <Text variant="headlineSmall" style={styles.statNumber}>
-                    {tasks.filter(t => t.status === 'completed').length}
-                  </Text>
-                  <Text variant="bodyMedium" style={styles.statLabel}>
-                    Completed
-                  </Text>
-                </Card.Content>
-              </Card>
-
-              <Card style={styles.statCard}>
-                <Card.Content>
-                  <Text variant="headlineSmall" style={styles.statNumber}>
-                    {tasks.filter(t => t.status === 'pending').length}
-                  </Text>
-                  <Text variant="bodyMedium" style={styles.statLabel}>
-                    Pending
-                  </Text>
-                </Card.Content>
-              </Card>
-            </View>
-
-            {/* Quick Actions */}
-            <Card style={styles.actionsCard}>
-              <Card.Content>
-                <Text variant="titleMedium" style={styles.sectionTitle}>
-                  Quick Actions
-                </Text>
-                <View style={styles.actionButtons}>
-                                  <Button
-                  mode="contained"
-                  onPress={() => router.push('chat')}
-                  style={styles.actionButton}
-                  icon="robot"
-                >
-                  AI Chat
-                </Button>
-                <Button
-                  mode="outlined"
-                  onPress={() => router.push('progress')}
-                  style={styles.actionButton}
-                  icon="chart-line"
-                >
-                  Progress
-                </Button>
-                </View>
-                <View style={styles.actionButtons}>
-                                  <Button
-                  mode="outlined"
-                  onPress={() => router.push('settings')}
-                  style={styles.actionButton}
-                  icon="cog"
-                >
-                  Settings
-                </Button>
-                <Button
-                  mode="outlined"
-                  onPress={() => router.push('tasks')}
-                  style={styles.actionButton}
-                  icon="format-list-bulleted"
-                >
-                  All Tasks
-                </Button>
-                </View>
-              </Card.Content>
-            </Card>
-
-            {/* Quick Add Task */}
-            <QuickAddTask onTaskAdded={getTasks} />
-
-            {/* Task List */}
-            <Card style={styles.tasksCard}>
-              <Card.Content>
-                <Text variant="titleMedium" style={styles.sectionTitle}>
-                  Priority Tasks
-                </Text>
-                {tasks.length > 0 ? (
-                  <View style={styles.taskListContainer}>
-                    <TaskList 
-                      onTaskSelect={(task) => {
-                        // Select the task and navigate to focus session
-                        useTaskStore.getState().selectTask(task);
-                        router.push('focus/25');
-                      }}
-                    />
-                  </View>
-                ) : (
-                  <View style={styles.emptyState}>
-                    <Text variant="bodyLarge" style={styles.emptyText}>
-                      No tasks yet
+                  <View style={styles.taskHeader}>
+                    <Text variant="bodyLarge" style={styles.taskTitle}>
+                      {task.title}
                     </Text>
-                    <Text variant="bodyMedium" style={styles.emptySubtext}>
-                      Add your first task to get started
-                    </Text>
-                                    <Button
-                  mode="contained"
-                  onPress={() => router.push('chat')}
-                  style={styles.emptyButton}
-                >
-                  Add First Task
-                </Button>
+                    <Chip 
+                      mode="outlined" 
+                      style={styles.priorityChip}
+                      textStyle={{ color: colors.primary[600] }}
+                    >
+                      Priority: {task.priority_score}
+                    </Chip>
                   </View>
-                )}
-              </Card.Content>
-            </Card>
-
-            {/* Session Types */}
-            <Card style={styles.sessionTypesCard}>
-              <Card.Content>
-                <Text variant="titleMedium" style={styles.sectionTitle}>
-                  Focus Session Types
-                </Text>
-                <View style={styles.sessionTypes}>
-                  <Chip
-                    mode="outlined"
-                    onPress={() => router.push('focus/25')}
-                    style={styles.sessionChip}
+                  {task.description && (
+                    <Text variant="bodySmall" style={styles.taskDescription}>
+                      {task.description}
+                    </Text>
+                  )}
+                  <Button
+                    mode="contained"
+                    onPress={() => {
+                      useTaskStore.getState().selectTask(task);
+                      const duration = task.estimated_minutes || 25;
+                      router.push(`focus/${duration}`);
+                    }}
+                    style={styles.startButton}
+                    icon="play"
                   >
-                    Pomodoro (25min)
-                  </Chip>
-                  <Chip
-                    mode="outlined"
-                    onPress={() => router.push('focus/50')}
-                    style={styles.sessionChip}
-                  >
-                    Deep Work (50min)
-                  </Chip>
-                  <Chip
-                    mode="outlined"
-                    onPress={() => router.push('focus/15')}
-                    style={styles.sessionChip}
-                  >
-                    Quick Win (15min)
-                  </Chip>
-                </View>
-              </Card.Content>
-            </Card>
-          </>
+                    Start Focus Session
+                  </Button>
+                </Card.Content>
+              </Card>
+            ))}
+          </View>
+        ) : (
+          <View style={styles.emptyState}>
+            <Text variant="bodyLarge" style={styles.emptyText}>
+              No tasks yet
+            </Text>
+            <Text variant="bodyMedium" style={styles.emptySubtext}>
+              Start by adding your first task
+            </Text>
+            <Button
+              mode="contained"
+              onPress={() => router.push('chat')}
+              style={styles.emptyButton}
+              icon="plus"
+            >
+              Add First Task
+            </Button>
+          </View>
         )}
-        showsVerticalScrollIndicator={false}
-      />
+      </Card.Content>
+    </Card>
+  );
 
+  // Render focus sessions section
+  const renderFocusSessions = () => (
+    <Card style={styles.sessionsCard}>
+      <Card.Content>
+        <Text variant="titleLarge" style={styles.sectionTitle}>
+          Focus Sessions
+        </Text>
+        <Text variant="bodyMedium" style={styles.sectionSubtitle}>
+          Choose your session type
+        </Text>
+        
+        <View style={styles.sessionTypes}>
+          <Chip
+            mode="outlined"
+            onPress={() => router.push('focus/25')}
+            style={styles.sessionChip}
+            textStyle={styles.sessionChipText}
+          >
+            🍅 Pomodoro (25min)
+          </Chip>
+          <Chip
+            mode="outlined"
+            onPress={() => router.push('focus/50')}
+            style={styles.sessionChip}
+            textStyle={styles.sessionChipText}
+          >
+            ⏰ Deep Work (50min)
+          </Chip>
+          <Chip
+            mode="outlined"
+            onPress={() => router.push('focus/90')}
+            style={styles.sessionChip}
+            textStyle={styles.sessionChipText}
+          >
+            🎯 Extended (90min)
+          </Chip>
+        </View>
+      </Card.Content>
+    </Card>
+  );
+
+  // Main content sections
+  const sections = [
+    { key: 'header', render: renderHeader },
+    { key: 'stats', render: renderStats },
+    { key: 'actions', render: renderActions },
+    { key: 'quickAdd', render: renderQuickAdd },
+    { key: 'priorityTasks', render: renderPriorityTasks },
+    { key: 'focusSessions', render: renderFocusSessions },
+  ];
+
+  const renderItem = ({ item }: { item: any }) => item.render();
+
+  return (
+    <View style={styles.container}>
+      <FlatList
+        data={sections}
+        renderItem={renderItem}
+        keyExtractor={(item) => item.key}
+        style={styles.content}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.contentContainer}
+      />
+      
       <FAB
         icon="plus"
         style={styles.fab}
         onPress={() => router.push('chat')}
-        label="Add Task"
+        color={colors.surface.light}
       />
     </View>
   );
@@ -240,67 +297,111 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingTop: 60,
     backgroundColor: colors.surface.light,
-    elevation: 2,
+    elevation: 1,
+  },
+  headerContent: {
+    flex: 1,
   },
   title: {
     color: colors.primary[600],
     fontWeight: 'bold',
+    marginBottom: 2,
+  },
+  subtitle: {
+    color: colors.text.secondary.light,
   },
   content: {
     flex: 1,
     padding: 16,
   },
-  welcomeCard: {
-    marginBottom: 16,
-    elevation: 2,
-  },
-  welcomeTitle: {
-    color: colors.primary[600],
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  welcomeSubtitle: {
-    color: colors.text.secondary.light,
+  contentContainer: {
+    paddingBottom: 80, // Add padding at the bottom for the FAB
   },
   statsContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
+    gap: 12,
+    marginBottom: 24,
   },
   statCard: {
     flex: 1,
-    marginHorizontal: 4,
-    elevation: 2,
+    elevation: 1,
+    backgroundColor: colors.surface.primary,
+  },
+  statContent: {
+    alignItems: 'center',
+    paddingVertical: 16,
   },
   statNumber: {
     color: colors.primary[600],
     fontWeight: 'bold',
-    textAlign: 'center',
+    marginBottom: 4,
   },
   statLabel: {
     color: colors.text.secondary.light,
     textAlign: 'center',
-    marginTop: 4,
   },
-  actionsCard: {
+  actionsContainer: {
+    marginBottom: 24,
+  },
+  mainActionButton: {
+    backgroundColor: colors.primary[600],
+    marginBottom: 12,
+    borderRadius: 12,
+  },
+  mainActionContent: {
+    paddingVertical: 8,
+  },
+  secondaryActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  secondaryButton: {
+    flex: 1,
+    borderColor: colors.primary[300],
+    borderRadius: 8,
+  },
+  tasksCard: {
+    marginBottom: 24,
+    elevation: 1,
+    backgroundColor: colors.surface.primary,
+  },
+  sectionHeader: {
     marginBottom: 16,
-    elevation: 2,
   },
   sectionTitle: {
     color: colors.text.primary.light,
     fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  sectionSubtitle: {
+    color: colors.text.secondary.light,
+  },
+  taskListContainer: {
+    maxHeight: 300,
+  },
+  taskItem: {
     marginBottom: 12,
+    borderRadius: 8,
   },
-  actionButtons: {
+  taskHeader: {
     flexDirection: 'row',
-    gap: 12,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
   },
-  actionButton: {
+  taskTitle: {
     flex: 1,
+    marginRight: 8,
   },
-  tasksCard: {
-    marginBottom: 16,
-    elevation: 2,
+  priorityChip: {
+    backgroundColor: colors.surface.secondary,
+  },
+  taskDescription: {
+    color: colors.text.secondary.light,
+    marginBottom: 8,
+  },
+  startButton: {
+    backgroundColor: colors.primary[600],
   },
   emptyState: {
     alignItems: 'center',
@@ -309,29 +410,33 @@ const styles = StyleSheet.create({
   emptyText: {
     color: colors.text.secondary.light,
     marginBottom: 8,
+    fontWeight: '500',
   },
   emptySubtext: {
     color: colors.text.secondary.light,
-    marginBottom: 16,
+    marginBottom: 20,
     textAlign: 'center',
   },
   emptyButton: {
-    marginTop: 8,
+    backgroundColor: colors.primary[600],
   },
-  sessionTypesCard: {
-    marginBottom: 16,
-    elevation: 2,
+  sessionsCard: {
+    marginBottom: 24,
+    elevation: 1,
+    backgroundColor: colors.surface.primary,
   },
   sessionTypes: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+    marginTop: 8,
   },
   sessionChip: {
-    marginBottom: 8,
+    borderColor: colors.primary[300],
+    backgroundColor: colors.surface.secondary,
   },
-  taskListContainer: {
-    maxHeight: 400,
+  sessionChipText: {
+    color: colors.primary[600],
   },
   fab: {
     position: 'absolute',

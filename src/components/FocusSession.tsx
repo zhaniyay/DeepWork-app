@@ -24,6 +24,21 @@ export const FocusSession: React.FC<FocusSessionProps> = ({
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const appStateRef = useRef(AppState.currentState);
 
+  // Debug logging
+  console.log('FocusSession Debug:', {
+    taskTitle: task.title,
+    taskEstimated: task.estimated_minutes,
+    duration,
+    timeRemaining,
+    isActive
+  });
+
+  // Update timeRemaining when duration changes
+  useEffect(() => {
+    console.log('Duration changed:', duration, 'Setting timeRemaining to:', duration * 60);
+    setTimeRemaining(duration * 60);
+  }, [duration]);
+
   useEffect(() => {
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
       if (
@@ -95,7 +110,10 @@ export const FocusSession: React.FC<FocusSessionProps> = ({
     onSessionComplete(outcome);
   };
 
-  const progress = 1 - timeRemaining / (duration * 60);
+  // Calculate progress based on time elapsed, not remaining
+  const totalSeconds = duration * 60;
+  const elapsedSeconds = totalSeconds - timeRemaining;
+  const progress = elapsedSeconds / totalSeconds;
 
   return (
     <View style={styles.container}>
